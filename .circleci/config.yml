@@ -117,8 +117,7 @@ jobs:
           command: |
             cd frontend
             npm install
-             
-            # npm audit fix --audit-level=critical --force
+            npm update jest webpack webpack-dev-server html-loader axios ts-jest postcss webpack-cli babel-loader
             npm audit --audit-level=critical
       - save_cache:
           paths: [frontend/node_modules]
