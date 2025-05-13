@@ -119,9 +119,9 @@ jobs:
             npm install
             npm audit --audit-level=critical 
             npm audit --audit-level=critical
-            # npm update jest webpack webpack-dev-server html-loader axios ts-jest postcss webpack-cli babel-loader
+            npm update jest webpack webpack-dev-server html-loader axios ts-jest postcss webpack-cli babel-loader
             # npm audit fix --force
-            # npm audit --audit-level=critical 
+            npm audit fix --audit-level=critical
       - save_cache:
           paths: [frontend/node_modules]
           key: frontend-scan
