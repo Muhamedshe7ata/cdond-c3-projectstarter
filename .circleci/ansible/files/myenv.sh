@@ -8,3 +8,5 @@ export TYPEORM_DATABASE=postgres
 export TYPEORM_MIGRATIONS=./src/migrations/*.ts
 export TYPEORM_MIGRATIONS_DIR=./src/migrations
 export TYPEORM_EXTRA='{"ssl": true}'
+
+C:\Users\ElQattanM\cdond-c3-projectstarter\.circleci\ansible\files\myenv.sh
