@@ -1,22 +1,59 @@
+---
+
+# Add Node.js from source (Ensure this is the first task related to Node.js)
 - name: "Add Node.js from source"
   become: true
   shell: |
     curl -sl https://deb.nodesource.com/setup_20.x | sudo -E bash -
 
-- name: "Install Node.js 13"
+# Install Node.js 20 (Ensure this runs AFTER Add Node.js from source)
+- name: "Install Node.js 20" # Updated name for clarity
   become: true
   apt:
     name: ["nodejs"]
-    state: latest
+    state: latest # This will install the version from the added NodeSource repo
     update_cache: yes
 
+# Install PM2 Globally
 - name: "Install PM2 Globally"
+  become: true # PM2 global install typically requires elevated privileges
   npm:
     name: pm2
     global: yes
 
+# move env variables to /etc/profile.d/
 - name: "move env variables to /etc/profile.d/"
-  become: true
+  become: true # Writing to /etc/profile.d/ requires elevated privileges
   copy:
-    src: myenv.sh
-    dest: /etc/profile.d/
+    src: myenv.sh # Source relative to roles/configure-server/files/
+    dest: /etc/profile.d/ # Destination path on the EC2 instance
+    owner: root # Ensure root owns system-wide files
+    group: root # Ensure root owns system-wide files
+    mode: '0644' # Standard file permissions
+
+
+
+  # - name: "Add Node.js from source"
+#   become: true
+#   shell: |
+#     curl -sl https://deb.nodesource.com/setup_20.x | sudo -E bash -
+
+# - name: "Install Node.js 13"
+#   become: true
+#   apt:
+#     name: ["nodejs"]
+#     state: latest
+#     update_cache: yes
+
+# - name: "Install PM2 Globally"
+#   npm:
+#     name: pm2
+#     global: yes
+
+# - name: "move env variables to /etc/profile.d/"
+#   become: true
+#   copy:
+#     src: myenv.sh
+#     dest: /etc/profile.d/
+
+# .circleci/ansible/roles/configure-server/tasks/main.yml
