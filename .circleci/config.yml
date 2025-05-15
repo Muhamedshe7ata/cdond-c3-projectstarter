@@ -230,7 +230,7 @@ jobs:
           command: |
             cd .circleci/ansible
             cat inventory.txt # This line is likely for debugging/verification
-            ansible-playbook -i inventory.txt configure-server.yml --v
+            ansible-playbook -i inventory.txt configure-server.yml -vvv
             timeout: 30m
  
       - run:
