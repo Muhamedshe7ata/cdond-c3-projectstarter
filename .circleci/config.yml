@@ -236,47 +236,25 @@ jobs:
       - run:
           name: Run migrations on EC2 instance via SSH
           command: |
-            # Get the Public IP of the backend instance using the latest stack name
-            # This assumes the backend stack name includes the workflow ID suffix
             BACKEND_STACK_NAME="udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}"
-            # Add --region if not set globally in your CircleCI config
             PUBLIC_IP=$(aws ec2 describe-instances \
               --region eu-north-1 \
               --query 'Reservations[*].Instances[*].PublicIpAddress' \
               --filter Name=tag:Name,Values="backend-${CIRCLE_WORKFLOW_ID:0:7}" Name=instance-state-name,Values=running \
               --output text
             )
-
             if [ -z "$PUBLIC_IP" ]; then
               echo "Error: Could not get Public IP for backend instance from stack ${BACKEND_STACK_NAME}"
-              # Exit with error if the IP is not found
               exit 1
             fi
-
             echo "Found backend EC2 Public IP: ${PUBLIC_IP}"
-
-            # Use the SSH key provided by CircleCI add_ssh_keys step
             SSH_KEY_PATH="~/.ssh/id_rsa"
-
-            # Determine the SSH user (ubuntu or ec2-user) - matches the user in Ansible playbook
-            SSH_USER="ubuntu" # Change to ec2-user if that's correct for your AMI
-
-            # Define the path where project code was copied by Ansible
-            PROJECT_REMOTE_PATH="/home/${SSH_USER}/project" # Matches project_remote_path in Ansible
-
-            # Command to execute remotely on the EC2 instance
-            # Navigate to backend, source the environment file, then run npm install and migrations
-            # Using 'bash -c' to ensure the commands run in a bash shell that sources the environment
+            SSH_USER="ubuntu"
+            PROJECT_REMOTE_PATH="/home/${SSH_USER}/project"
             REMOTE_COMMAND="cd ${PROJECT_REMOTE_PATH}/backend && source myenv.sh && npm install && npm run migrations"
-
             echo "Executing remote command: ${REMOTE_COMMAND}"
-
-            # Execute the command via SSH. -o StrictHostKeyChecking=no is used to avoid interactive prompts.
-            # Add -t if you need a pseudo-terminal (sometimes helpful for interactive commands, but not usually needed for npm/shell scripts)
             ssh -o StrictHostKeyChecking=no -i ${SSH_KEY_PATH} ${SSH_USER}@${PUBLIC_IP} "${REMOTE_COMMAND}"
-
             echo "Migrations command finished."
-
 # Remove the original run-migrations job definition from your workflow section
 # and any steps that referred to it (like destroy-environment or revert-migrations if they were linked there)      
 
