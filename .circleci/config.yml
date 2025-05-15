@@ -217,6 +217,8 @@ jobs:
     docker:
       # Docker image here that supports Ansible
       - image: cimg/base:stable
+    working_directory: ~/project
+    resource_class: medium
     
     steps:
       - checkout
@@ -226,27 +228,16 @@ jobs:
       - attach_workspace:
           at: ~/
       - install_ansible
-      - run:
-          name: Inspect workspace before Ansible
-          command: |
-            echo "Current directory in workspace:"
-            pwd
-            echo "Contents of project directory:"
-            ls -la ~/project
-            echo "Contents of Ansible directory:"
-            ls -la ~/project/.circleci/ansible
-            echo "Contents of Ansible files directory:"
-            # Make sure this path is correct relative to the project root
-            ls -la ~/project/.circleci/ansible/roles/configure-server/files/ # This seems like a custom step or orb job
+ 
       - run:
           name: Configure server
           command: |
             cd .circleci/ansible
-            cat inventory.txt # This line is likely for debugging/verification
+            
             ansible-playbook -i inventory.txt configure-server.yml -vvv
-      - destroy-environment
-      
-          
+      # - destroy-environment
+
+
           # timeout: 15m
       # - run:
       #     name: Run migrations on EC2 instance via SSH
