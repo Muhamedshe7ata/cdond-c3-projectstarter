@@ -235,56 +235,33 @@ jobs:
             cd .circleci/ansible
             
             ansible-playbook -i inventory.txt configure-server.yml -vvv
-      # - destroy-environment
+      - destroy-environment
 
+   
 
-          # timeout: 15m
-      # - run:
-      #     name: Run migrations on EC2 instance via SSH
-      #     command: |
-      #       BACKEND_STACK_NAME="udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}"
-      #       PUBLIC_IP=$(aws ec2 describe-instances \
-      #         --region eu-north-1 \
-      #         --query 'Reservations[*].Instances[*].PublicIpAddress' \
-      #         --filter Name=tag:Name,Values="backend-${CIRCLE_WORKFLOW_ID:0:7}" Name=instance-state-name,Values=running \
-      #         --output text
-      #       )
-      #       if [ -z "$PUBLIC_IP" ]; then
-      #         echo "Error: Could not get Public IP for backend instance from stack ${BACKEND_STACK_NAME}"
-      #         exit 1
-      #       fi
-      #       echo "Found backend EC2 Public IP: ${PUBLIC_IP}"
-      #       SSH_KEY_PATH="~/.ssh/id_rsa"
-      #       SSH_USER="ubuntu"
-      #       PROJECT_REMOTE_PATH="/home/${SSH_USER}/project"
-      #       REMOTE_COMMAND="cd ${PROJECT_REMOTE_PATH}/backend && source myenv.sh && npm install && npm run migrations"
-      #       echo "Executing remote command: ${REMOTE_COMMAND}"
-      #       ssh -o StrictHostKeyChecking=no -i ${SSH_KEY_PATH} ${SSH_USER}@${PUBLIC_IP} "${REMOTE_COMMAND}"
-      #       echo "Migrations command finished."
-# Remove the original run-migrations job definition from your workflow section
-# and any steps that referred to it (like destroy-environment or revert-migrations if they were linked there)      
+  run-migrations:
+    docker:
 
-  # run-migrations:
-  #   docker:
-  #     # Docker image here that supports Node.js
-  #     - image: circleci/node:13.8.0
-  #   steps:
-  #     - checkout
-  #     - run:
-  #         name: Run migrations
-  #         command: |
-  #           cd backend
-  #           npm install
-  #           npm run migrations > migrations_dump.txt
-  #     - run:
-  #         name: Send migration results to kvdb
-  #         command: |
-  #           if grep -q "has been executed successfully." ~/project/backend/migrations_dump.txt
-  #           then
-  #             curl --insecure https://kvdb.io/$Ui2YdCvJYVfFjmoeDVk3hE/migration_${CIRCLE_WORKFLOW_ID:0:7} -d '1'
-  #           fi
-  #     - destroy-environment # This seems to be calling another job or command
-  #     - revert-migrations # This seems to be calling another job or command   
+      - image: circleci/node:13.8.0
+    steps:
+      - checkout
+      - restore_cache:
+            keys: [backend-build]
+      - run:
+          name: Run migrations
+          command: |
+            cd backend
+            npm install
+            npm run migrations > migrations_dump.txt
+      - run:
+          name: Send migration results to kvdb
+          command: |
+            if grep -q "has been executed successfully." ~/project/backend/migrations_dump.txt
+            then
+              curl --insecure https://kvdb.io/Ui2YdCvJYVfFjmoeDVk3hE/migration_${CIRCLE_WORKFLOW_ID:0:7} -d '1'
+            fi
+      - destroy-environment # This seems to be calling another job or command
+      - revert-migrations # This seems to be calling another job or command   
 
 #   deploy-frontend:
 #     docker:
@@ -402,8 +379,8 @@ workflows:
               only: [master]
       - configure-infrastructure:
           requires: [deploy-infrastructure]
-      # - run-migrations:
-      #     requires: [configure-infrastructure]
+      - run-migrations:
+          requires: [configure-infrastructure]
       # - deploy-frontend:
       #     requires: [run-migrations]
       # - deploy-backend:
