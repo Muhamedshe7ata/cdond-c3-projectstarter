@@ -230,7 +230,8 @@ jobs:
           command: |
             cd .circleci/ansible
             cat inventory.txt # This line is likely for debugging/verification
-            ansible-playbook -i inventory.txt configure-server.yml  
+            ansible-playbook -i inventory.txt configure-server.yml
+            timeout: 30m
  
       - run:
           name: Run migrations on EC2 instance via SSH
