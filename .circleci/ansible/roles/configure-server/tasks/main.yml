@@ -22,7 +22,6 @@
     src: myenv.sh
     dest: /etc/profile.d/
 
-      .circleci/ansible/roles/configure-server/tasks/main.yml
 
 
 # Add Node.js from source (Ensure this is the first task related to Node.js)
