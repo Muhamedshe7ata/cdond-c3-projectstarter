@@ -236,42 +236,60 @@ jobs:
             
             ansible-playbook -i inventory.txt configure-server.yml -vvv
       - destroy-environment
+
   run-migrations:
-    docker:
-      - image: cimg/node:13.8.0
-    steps:
+      docker:
+        - image: cimg/node:18.18.2
+      steps:
       - checkout
+      - restore_cache:
+          keys: [backend-build]
+
       - run:
-          name: Install dependencies
+          name: Install AWS CLI
           command: |
-            sudo apt install -y tar gzip curl
+            sudo apt update
+            sudo apt install -y unzip curl
             curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
             unzip -qq awscliv2.zip
             sudo ./aws/install
-      - restore_cache:
-          keys: [backend-build]
+
       - run:
-          name: Run migrations
+          name: Install Dependencies
           command: |
-            cd backend/src
-            npm run migrations >> migrations.txt
+            cd backend
+            npm install
+
+      - run:
+          name: Build Project
+          command: |
+            cd backend
+            npm run build
+
+      - run:
+          name: Run Migrations
+          command: |
+            cd backend
+            npm run migrations > migrations.txt
             cat migrations.txt
+
       - run:
-          name: Send migration results to kvdb
+          name: Check Migration Success and Update KVDB
           command: |
-            if grep -q "SELECT" ~/project/backend/src/migrations.txt
-            then
-                # If you are using kvdb.io, generate the bucket ID "${KVDB_BUCKET}" in your local terminal first
-                curl --insecure https://kvdb.io/${KVDB_BUCKET}/migration_${CIRCLE_WORKFLOW_ID:0:7} -d '1'
-            fi
-      - destroy-environment
-      - revert-migrations
-   
+              if grep -q "No migrations are pending" backend/migrations.txt || grep -q "has been executed successfully" backend/migrations.txt; then
+                echo "Migration successful. Updating KVDB..."
+                
+                curl https://kvdb.io/Ui2YdCvJYVfFjmoeDVk3hE//migration_${CIRCLE_WORKFLOW_ID:0:7} -d '1'
+              else
+                echo "Migration failed or no success message found."
+                exit 1
+              fi
+
+       
+ 
 
   # run-migrations:
-  #   docker:
-
-  #     - image: circleci/node:13.8.0
+  
   #   steps:
   #     - checkout
   #     - restore_cache:
@@ -289,8 +307,8 @@ jobs:
   #           then
   #             curl --insecure https://kvdb.io/Ui2YdCvJYVfFjmoeDVk3hE/migration_${CIRCLE_WORKFLOW_ID:0:7} -d '1'
   #           fi
-  #     - destroy-environment # This seems to be calling another job or command
-  #     - revert-migrations # This seems to be calling another job or command   
+      # - destroy-environment # This seems to be calling another job or command
+      # - revert-migrations # This seems to be calling another job or command   
 
 #   deploy-frontend:
 #     docker:
