@@ -275,18 +275,15 @@ jobs:
 
       - run:
           name: Check Migration Success and Update KVDB
-          command: |
-              if grep -q "No migrations are pending" backend/migrations.txt || grep -q "has been executed successfully" backend/migrations.txt; then
-                echo "Migration successful. Updating KVDB..."
-                
-                curl https://kvdb.io/Ui2YdCvJYVfFjmoeDVk3hE/migration_${CIRCLE_WORKFLOW_ID:0:7} -d '1'
-              else
-                echo "Migration failed or no success message found."
-                exit 1
-              fi
-
+          command: | 
+               if grep -q "has been executed successfully." ~/project/backend/migrations_dump.txt
+               then
+               curl --insecure https://kvdb.io/Ui2YdCvJYVfFjmoeDVk3hE/migration_${CIRCLE_WORKFLOW_ID:0:7} -d '1'
+               fi
        
- 
+      - destroy-environment # This seems to be calling another job or command
+      - revert-migrations # This seems to be calling another job or command   
+       
 
   # run-migrations:
   
@@ -307,8 +304,7 @@ jobs:
   #           then
   #             curl --insecure https://kvdb.io/Ui2YdCvJYVfFjmoeDVk3hE/migration_${CIRCLE_WORKFLOW_ID:0:7} -d '1'
   #           fi
-      # - destroy-environment # This seems to be calling another job or command
-      # - revert-migrations # This seems to be calling another job or command   
+      
 
 #   deploy-frontend:
 #     docker:
