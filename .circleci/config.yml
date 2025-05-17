@@ -1,6 +1,15 @@
 version: 2.1
 
 commands:
+  install_awscli:
+    description: Install AWS cli
+    steps:
+      - run:
+          name: Install AWS cli
+          command: |
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip awscliv2.zip
+            sudo ./aws/install
   install_ansible:
      steps:
        - run:
@@ -295,10 +304,11 @@ jobs:
           keys: [frontend-build]
       - attach_workspace:
           at: ~/
-      - run:
-            name: Install Dependencies
-            command: |
-              apk add --update --no-cache tar gzip nodejs npm aws-cli curl
+
+      - install_nodejs
+      - install_awscli
+      - install_ansible
+      
       - run:
           name: Get backend url
           command: |
@@ -326,17 +336,16 @@ jobs:
       - image: cimg/base:stable
     steps:
       - checkout
+      - restore_cache:
+          keys: [backend-deps]
       - add_ssh_keys:
             fingerprints:
               - "SHA256:FJogcncZoAfN0hgvqhqDgAiiOafEii9G+HsAStU+Ok4"
       - attach_workspace:
           at: ~/
-      - restore_cache:
-          keys: [backend-deps]
-      - run:
-            name: Install Dependencies
-            command: |
-              apk add --update --no-cache tar gzip nodejs npm aws-cli curl ansible
+      - install_nodejs
+      - install_awscli
+      - install_ansible
       - run:
           name: Deploy backend
           command: |
@@ -349,6 +358,7 @@ jobs:
             mv artifact.tar.gz .circleci/ansible/roles/deploy/files/artifact.tar.gz
             cd .circleci/ansible
             ansible-playbook -i inventory.txt deploy-backend.yml
+            
       - destroy-environment
       - revert-migrations
 
