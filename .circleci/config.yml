@@ -270,7 +270,7 @@ jobs:
           name: Run Migrations
           command: |
             cd backend
-            npm run migrations > migrations.txt
+            npm run migrations > migrations.txt 2>&1
             cat migrations.txt
 
       - run:
@@ -279,7 +279,7 @@ jobs:
               if grep -q "No migrations are pending" backend/migrations.txt || grep -q "has been executed successfully" backend/migrations.txt; then
                 echo "Migration successful. Updating KVDB..."
                 
-                curl https://kvdb.io/Ui2YdCvJYVfFjmoeDVk3hE//migration_${CIRCLE_WORKFLOW_ID:0:7} -d '1'
+                curl https://kvdb.io/Ui2YdCvJYVfFjmoeDVk3hE/migration_${CIRCLE_WORKFLOW_ID:0:7} -d '1'
               else
                 echo "Migration failed or no success message found."
                 exit 1
