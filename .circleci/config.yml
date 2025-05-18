@@ -435,10 +435,7 @@ jobs:
             else
                 exit 1
             fi
-      - destroy-environment: 
-          when: always 
-      - revert-migrations:   
-          when: always
+       
 
   cloudfront-update:
     docker:
