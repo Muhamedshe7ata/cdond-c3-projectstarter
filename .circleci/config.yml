@@ -455,10 +455,10 @@ jobs:
             fi
       
       # Add 'when: always' to ensure these run even if tests fail
-      - destroy-environment:
-          when: always
-      - revert-migrations:   
-          when: always
+      # - destroy-environment:
+      #     when: always
+      # - revert-migrations:   
+      #     when: always
 
     # smoke-test:
     #   docker:
@@ -630,9 +630,9 @@ workflows:
           requires: [run-migrations]
       - smoke-test:
            requires: [deploy-backend, deploy-frontend]
-           
+
       # - cloudfront-update:
       #     requires: [smoke-test]
       # - cleanup:
-      #    #########################################
+      
       
