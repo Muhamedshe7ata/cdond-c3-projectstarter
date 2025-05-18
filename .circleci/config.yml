@@ -387,13 +387,21 @@ jobs:
               --output text)
             export API_URL=http://${BACKEND_PUBLIC_IP}:3030
             echo ${BACKEND_PUBLIC_IP}
-            echo t::kend-${CIRCLE_WORKFLOW_ID:0:7}
-            echo $API_URL}
-            if curl -s $API_URL/api/status | grep "ok"
+            
+            echo "API URL: ${API_URL}"
+            echo "Attempting to connect to ${API_URL}/api/status"
+            CURL_OUTPUT=$(curl -v -f -m 30 -o - ${API_URL}/api/status 2>&1)
+            CURL_EXIT_CODE=$?
+            echo "--- Curl Output ---"
+            echo "${CURL_OUTPUT}"
+            echo "Curl Exit Code: ${CURL_EXIT_CODE}"
+            echo "-------------------"
+             if echo "${CURL_OUTPUT}" | grep "ok" # Grep the captured output
             then
+              echo "Smoke test passed: 'ok' found in response."
               exit 0
             else
-              
+              echo "Smoke test failed: 'ok' not found in response."
               exit 1
             fi
       - run:
