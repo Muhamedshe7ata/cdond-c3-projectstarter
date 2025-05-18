@@ -379,33 +379,53 @@ jobs:
       - install_nodejs
       - install_awscli
       - run:
-          name: Backend smoke test.
+          name: Backend smoke test
           command: |
+            #!/bin/bash -eo pipefail
+
             BACKEND_PUBLIC_IP=$(aws ec2 describe-instances \
               --filters "Name=tag:Name,Values=backend-${CIRCLE_WORKFLOW_ID:0:7}" \
               --query 'Reservations[*].Instances[*].PublicIpAddress' \
               --output text)
-            export API_URL=http://${BACKEND_PUBLIC_IP}:3030
-            echo ${BACKEND_PUBLIC_IP}
-            
-            echo "API URL: ${API_URL}"
-            echo "Attempting to connect to ${API_URL}/api/status"
-            CURL_OUTPUT=$(curl -v -f -m 30 -o - ${API_URL}/api/status 2>&1)
-            CURL_EXIT_CODE=$?
-            echo "--- Curl Output ---"
-            echo "${CURL_OUTPUT}"
-            echo "Curl Exit Code: ${CURL_EXIT_CODE}"
-            echo "-------------------"
-             if echo "${CURL_OUTPUT}" | grep "ok" # Grep the captured output
-            then
-              echo "Smoke test passed: 'ok' found in response."
-              exit 0
-            else
-              echo "Smoke test failed: 'ok' not found in response."
+
+            if [ -z "$BACKEND_PUBLIC_IP" ]; then
+              echo "Error: Could not find backend EC2 instance or IP address."
               exit 1
             fi
+
+            export API_URL=http://${BACKEND_PUBLIC_IP}:3030
+            
+            max_retries=15
+            delay=10
+            
+            for i in $(seq 1 $max_retries); do
+                
+                CURL_OUTPUT=$(curl -v -f -m 30 -o - ${API_URL}/api/status 2>&1)
+                CURL_EXIT_CODE=$?
+                
+                echo "--- Curl Output (Attempt $i) ---"
+                echo "${CURL_OUTPUT}"
+                echo "Curl Exit Code (Attempt $i): ${CURL_EXIT_CODE}"
+                echo "-------------------"
+                
+                if [ ${CURL_EXIT_CODE} -eq 0 ] && echo "${CURL_OUTPUT}" | grep -q "ok"; then
+                    echo "Smoke test passed: 'ok' found in response after retry $i."
+                    exit 0
+                elif [ ${CURL_EXIT_CODE} -ne 7 ]; then
+                    echo "Warning: Curl connected (exit code ${CURL_EXIT_CODE}), but 'ok' not found in response."
+                else
+                    echo "Connection failed (curl exit code ${CURL_EXIT_CODE}). Retrying in ${delay}s..."
+                fi
+
+                if [ $i -lt $max_retries ]; then
+                    sleep $delay
+                fi
+            done
+
+            echo "Backend smoke test failed after ${max_retries} retries."
+            exit 1
       - run:
-          name: Frontend smoke test.
+          name: Frontend smoke test
           command: |
             FRONTEND_WEBSITE=http://udapeople-${CIRCLE_WORKFLOW_ID:0:7}.s3-website.${AWS_DEFAULT_REGION}.amazonaws.com
             echo $FRONTEND_WEBSITE
@@ -417,8 +437,6 @@ jobs:
             fi
       - destroy-environment
       - revert-migrations
-
-  
         
 
   cloudfront-update:
