@@ -316,7 +316,7 @@ jobs:
       - install_nodejs
       - install_awscli
       - install_ansible
-      
+       
       - run:
           name: Get backend url
           command: |
@@ -370,40 +370,47 @@ jobs:
 
       - destroy-environment
       - revert-migrations
-
   smoke-test:
     docker:
       - image: cimg/base:stable
     steps:
       - checkout
-      - install_nodejs
-      - install_awscli
+      - install_nodejs # Ensure this command is defined in commands:
+      - install_awscli # Ensure this command is defined in commands:
+      # Note: install_ansible is not used in this job based on your frontend/backend defs
+
       - run:
           name: Backend smoke test
           command: |
             #!/bin/bash -eo pipefail
 
-            export BACKEND_IP=$(aws ec2 describe-instances \
-            --query 'Reservations[*].Instances[*].PublicIpAddress' \
-            --filters Name=tag:aws:cloudformation:stack-name,Values=BackendStack \
-            --output text)
-            export API_URL="http://${BACKEND_IP}:3030"
-            echo "API_URL = ${API_URL}"
-            echo API_URL="http://${BACKEND_IP}:3030" >> frontend/.env
+            echo "Looking for backend instance with tag Name=tag:aws:cloudformation:stack-name,Values=udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}"
 
+            # Use the correct tag filter from the deploy-frontend job
+            BACKEND_PUBLIC_IP=$(aws ec2 describe-instances \
+              --filters Name=tag:aws:cloudformation:stack-name,Values=udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7} "Name=instance-state-name,Values=running"\
+              --query 'Reservations[*].Instances[*].PublicIpAddress' \
+              --output text)
 
             if [ -z "$BACKEND_PUBLIC_IP" ]; then
-              echo "Error: Could not find backend EC2 instance or IP address."
-              exit 1
+              echo "Error: Could not find running backend EC2 instance with the CloudFormation stack-name tag."
+              # You might want to add a brief sleep here and retry the IP lookup once if needed
+              # for extremely rapid provisioning, but the test retries below should handle it.
+              exit 1 # Exit 1 if IP not found, failing this step
             fi
 
             export API_URL=http://${BACKEND_PUBLIC_IP}:3030
+            echo "Found Backend Public IP: ${BACKEND_PUBLIC_IP}"
             
             max_retries=15
             delay=10
             
+            echo "Attempting to connect to ${API_URL}/api/status..."
+
             for i in $(seq 1 $max_retries); do
+                echo "Retry $i of $max_retries..."
                 
+                # Use curl to connect with verbose output for debugging
                 CURL_OUTPUT=$(curl -v -f -m 30 -o - ${API_URL}/api/status 2>&1)
                 CURL_EXIT_CODE=$?
                 
@@ -414,74 +421,185 @@ jobs:
                 
                 if [ ${CURL_EXIT_CODE} -eq 0 ] && echo "${CURL_OUTPUT}" | grep -q "ok"; then
                     echo "Smoke test passed: 'ok' found in response after retry $i."
-                    exit 0
+                    exit 0 # Exit the *step* successfully here
                 elif [ ${CURL_EXIT_CODE} -ne 7 ]; then
-                    echo "Warning: Curl connected (exit code ${CURL_EXIT_CODE}), but 'ok' not found in response."
+                     # If curl exited, but NOT due to connection error (exit code 7)
+                     echo "Warning: Curl connected (exit code ${CURL_EXIT_CODE}), but 'ok' not found in response body. Check logs above for curl output."
                 else
                     echo "Connection failed (curl exit code ${CURL_EXIT_CODE}). Retrying in ${delay}s..."
                 fi
 
+                # Sleep *only if* we haven't already successfully exited the step and haven't reached max retries
                 if [ $i -lt $max_retries ]; then
                     sleep $delay
                 fi
             done
 
+            # This message and exit 1 are reached *only* if the loop finishes all retries without exit 0
             echo "Backend smoke test failed after ${max_retries} retries."
-            exit 1
+            exit 1 # This will fail the step if all retries are exhausted
+
       - run:
           name: Frontend smoke test
           command: |
             FRONTEND_WEBSITE=http://udapeople-${CIRCLE_WORKFLOW_ID:0:7}.s3-website.${AWS_DEFAULT_REGION}.amazonaws.com
             echo $FRONTEND_WEBSITE
-            if curl -s $FRONTEND_WEBSITE | grep "Welcome"
+            # Removed -s from curl to potentially see more output on failure if grep fails
+            if curl $FRONTEND_WEBSITE | grep "Welcome" 
             then
+              echo "Frontend smoke test passed: 'Welcome' found on the page."
               exit 0
             else
+                echo "Frontend smoke test failed: 'Welcome' not found on the page."
                 exit 1
             fi
+      
+      # Add 'when: always' to ensure these run even if tests fail
+      - destroy-environment:
+          when: always
+      - revert-migrations:   
+          when: always
+
+    # smoke-test:
+    #   docker:
+    #     - image: cimg/base:stable
+    #   steps:
+    #     - checkout
+    #     - install_awscli
+    #     - install_nodejs
+    #     - run:
+    #         name: Backend smoke test.
+    #         command: |
+    #           echo "Looking for backend instance with tag Name=tag:aws:cloudformation:stack-name,Values=udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}"
+    #           BACKEND_PUBLIC_IP=$(aws ec2 describe-instances \
+    #           --filters Name=tag:aws:cloudformation:stack-name,Values=udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7} "Name=instance-state-name,Values=running"\
+    #           --query 'Reservations[*].Instances[*].PublicIpAddress' \
+    #           --output text)
+
+    #           if [ -z "$BACKEND_PUBLIC_IP" ]; then
+    #             echo "Error: Could not find backend EC2 instance or IP address."
+    #             exit 1
+    #           fi
+
+    #           export API_URL=http://${BACKEND_PUBLIC_IP}:3030
+
+    #           if curl -s $API_URL/api/status | grep "ok"
+    #           then
+    #             exit 0
+    #           else
+    #             exit 1
+    #           fi
+#   smoke-test:
+#     docker:
+#       - image: cimg/base:stable
+#     steps:
+#       - checkout
+#       - install_nodejs
+#       - install_awscli
+#       - run:
+#           name: Backend smoke test
+#           command: |
+#             #!/bin/bash -eo pipefail
+
+#             export BACKEND_IP=$(aws ec2 describe-instances \
+#             --query 'Reservations[*].Instances[*].PublicIpAddress' \
+#             --filters Name=tag:aws:cloudformation:stack-name,Values=BackendStack \
+#             --output text)
+#             export API_URL="http://${BACKEND_IP}:3030"
+#             echo "API_URL = ${API_URL}"
+#             echo API_URL="http://${BACKEND_IP}:3030" >> frontend/.env
+
+
+#             if [ -z "$BACKEND_PUBLIC_IP" ]; then
+#               echo "Error: Could not find backend EC2 instance or IP address."
+#               exit 1
+#             fi
+
+#             export API_URL=http://${BACKEND_PUBLIC_IP}:3030
+            
+#             max_retries=15
+#             delay=10
+            
+#             for i in $(seq 1 $max_retries); do
+                
+#                 CURL_OUTPUT=$(curl -v -f -m 30 -o - ${API_URL}/api/status 2>&1)
+#                 CURL_EXIT_CODE=$?
+                
+#                 echo "--- Curl Output (Attempt $i) ---"
+#                 echo "${CURL_OUTPUT}"
+#                 echo "Curl Exit Code (Attempt $i): ${CURL_EXIT_CODE}"
+#                 echo "-------------------"
+                
+#                 if [ ${CURL_EXIT_CODE} -eq 0 ] && echo "${CURL_OUTPUT}" | grep -q "ok"; then
+#                     echo "Smoke test passed: 'ok' found in response after retry $i."
+#                     exit 0
+#                 elif [ ${CURL_EXIT_CODE} -ne 7 ]; then
+#                     echo "Warning: Curl connected (exit code ${CURL_EXIT_CODE}), but 'ok' not found in response."
+#                 else
+#                     echo "Connection failed (curl exit code ${CURL_EXIT_CODE}). Retrying in ${delay}s..."
+#                 fi
+
+#                 if [ $i -lt $max_retries ]; then
+#                     sleep $delay
+#                 fi
+#             done
+
+#             echo "Backend smoke test failed after ${max_retries} retries."
+#             exit 1
+#       - run:
+#           name: Frontend smoke test
+#           command: |
+#             FRONTEND_WEBSITE=http://udapeople-${CIRCLE_WORKFLOW_ID:0:7}.s3-website.${AWS_DEFAULT_REGION}.amazonaws.com
+#             echo $FRONTEND_WEBSITE
+#             if curl -s $FRONTEND_WEBSITE | grep "Welcome"
+#             then
+#               exit 0
+#             else
+#                 exit 1
+#             fi
        
 
-  cloudfront-update:
-    docker:
-      - image: amazon/aws-cli
-    steps:
-      - checkout
-      - run:
-          name: Install dep / Save Old Workflow ID to kvdb.io
-          command: |
-            export OLD_WORKFLOW_ID=$(aws cloudformation \
-              list-exports --query 'Exports[?Name==\'WorkflowID\'].Value' \
-              --no-paginate --output text)
-            echo "Old Workflow ID: $OLD_WORKFLOW_ID"
-            curl https://kvdb.io/GihzLn9tKaSBumwtTTinRhb/old_workflow_id -d "${OLD_WORKFLOW_ID}"
-      - run:
-          name: Update cloudfront distribution
-          command: |
-            aws cloudformation deploy \
-              --template-file .circleci/files/cloudfront.yml \
-              --parameter-overrides WorkflowID="${CIRCLE_WORKFLOW_ID:0:7}" \
-              --stack-name InitialStack
-      - destroy-environment
-      - revert-migrations
-
-# cleanup:
+#   cloudfront-update:
 #     docker:
-#       # Docker image here
+#       - image: amazon/aws-cli
 #     steps:
-#       # Checkout code from git
+#       - checkout
 #       - run:
-#           name: Get old stack workflow id
+#           name: Install dep / Save Old Workflow ID to kvdb.io
 #           command: |
-#             # your code here
-#             export OldWorkflowID="the id here"
-#             export STACKS=[] #put the list of stacks here
+#             export OLD_WORKFLOW_ID=$(aws cloudformation \
+#               list-exports --query 'Exports[?Name==\'WorkflowID\'].Value' \
+#               --no-paginate --output text)
+#             echo "Old Workflow ID: $OLD_WORKFLOW_ID"
+#             curl https://kvdb.io/GihzLn9tKaSBumwtTTinRhb/old_workflow_id -d "${OLD_WORKFLOW_ID}"
 #       - run:
-#           name: Remove old stacks and files
+#           name: Update cloudfront distribution
 #           command: |
-#             if [[ "${STACKS[@]}" =~ "${OldWorkflowID}" ]]
-#             then
-#               # your code here
-#             fi
+#             aws cloudformation deploy \
+#               --template-file .circleci/files/cloudfront.yml \
+#               --parameter-overrides WorkflowID="${CIRCLE_WORKFLOW_ID:0:7}" \
+#               --stack-name InitialStack
+#       - destroy-environment
+#       - revert-migrations
+
+# # cleanup:
+# #     docker:
+# #       # Docker image here
+# #     steps:
+# #       # Checkout code from git
+# #       - run:
+# #           name: Get old stack workflow id
+# #           command: |
+# #             # your code here
+# #             export OldWorkflowID="the id here"
+# #             export STACKS=[] #put the list of stacks here
+# #       - run:
+# #           name: Remove old stacks and files
+# #           command: |
+# #             if [[ "${STACKS[@]}" =~ "${OldWorkflowID}" ]]
+# #             then
+# #               # your code here
+# #             fi
             
 
 workflows:
@@ -511,9 +629,10 @@ workflows:
       - deploy-backend:
           requires: [run-migrations]
       - smoke-test:
-          requires: [deploy-backend, deploy-frontend]
-      - cloudfront-update:
-          requires: [smoke-test]
+           requires: [deploy-backend, deploy-frontend]
+           
+      # - cloudfront-update:
+      #     requires: [smoke-test]
       # - cleanup:
       #    #########################################
       
