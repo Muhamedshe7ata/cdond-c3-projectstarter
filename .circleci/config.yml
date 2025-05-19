@@ -392,63 +392,79 @@ jobs:
                 echo "Frontend smoke test FAILED: 'Welcome' not found on the page or could not connect."
                 exit 1
             fi
-
-      # Backend smoke test is now second
       - run:
-          name: Backend smoke test
+          name: Backend smoke test.
           command: |
-            #!/bin/bash -eo pipefail
-
             BACKEND_PUBLIC_IP=$(aws ec2 describe-instances \
-              --filters Name=tag:aws:cloudformation:stack-name,Values=udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7} "Name=instance-state-name,Values=running"\
-              --query 'Reservations[*].Instances[*].PublicIpIpAddress' \
+              --filters "Name=tag:Name,Values=backend-${CIRCLE_WORKFLOW_ID:0:7}" \
+              --query 'Reservations[*].Instances[*].PublicIpAddress' \
               --output text)
 
-            if [ -z "$BACKEND_PUBLIC_IP" ]; then
-              echo "Error: Could not find running backend EC2 instance with the CloudFormation stack-name tag."
+            export API_URL=http://${BACKEND_PUBLIC_IP}:3030
+
+            if curl -s $API_URL/api/status | grep "ok"
+            then
+              exit 0
+            else
               exit 1
             fi
 
-            export API_URL="http://${BACKEND_PUBLIC_IP}:3030"
-            echo "Found Backend Public IP: ${BACKEND_PUBLIC_IP}"
+      # # Backend smoke test is now second
+      # - run:
+      #     name: Backend smoke test
+      #     command: |
+      #       #!/bin/bash -eo pipefail
 
-            max_retries=15
-            delay=10
+      #       BACKEND_PUBLIC_IP=$(aws ec2 describe-instances \
+      #         --filters Name=tag:aws:cloudformation:stack-name,Values=udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7} "Name=instance-state-name,Values=running"\
+      #         --query 'Reservations[*].Instances[*].PublicIpIpAddress' \
+      #         --output text)
 
-            echo "Attempting to connect to ${API_URL}/api/status..."
+      #       if [ -z "$BACKEND_PUBLIC_IP" ]; then
+      #         echo "Error: Could not find running backend EC2 instance with the CloudFormation stack-name tag."
+      #         exit 1
+      #       fi
 
-            for i in $(seq 1 $max_retries); do
-                echo "Retry $i of $max_retries: Connecting to ${API_URL}/api/status ..."
+      #       export API_URL="http://${BACKEND_PUBLIC_IP}:3030"
+      #       echo "Found Backend Public IP: ${BACKEND_PUBLIC_IP}"
 
-                CURL_OUTPUT=$(curl -v -f -m 30 -o - "${API_URL}/api/status" 2>&1) || true
-                CURL_EXIT_CODE=$?
+      #       max_retries=15
+      #       delay=10
 
-                echo "--- Curl Output (Attempt $i, Exit Code ${CURL_EXIT_CODE}) ---"
-                echo "${CURL_OUTPUT}"
-                echo "-----------------------------------------------------"
+      #       echo "Attempting to connect to ${API_URL}/api/status..."
 
-                if [ ${CURL_EXIT_CODE} -eq 0 ]; then
-                    if echo "${CURL_OUTPUT}" | grep -q "ok"; then
-                         echo "Smoke test PASSED: Found 'ok' in response after retry $i."
-                         exit 0
-                    else
-                         echo "Smoke test FAILED on attempt $i: Curl connected (exit code 0), but 'ok' not found in response body. Check logs above."
-                    fi
-                elif [ ${CURL_EXIT_CODE} -eq 7 ]; then
-                    echo "Connection FAILED (curl exit code 7: Couldn't connect to host) on attempt $i. Retrying in ${delay}s..."
-                elif [ ${CURL_EXIT_CODE} -eq 28 ]; then
-                    echo "Connection FAILED (curl exit code 28: Operation timed out) on attempt $i. Retrying in ${delay}s..."
-                else
-                    echo "Curl FAILED with unexpected exit code ${CURL_EXIT_CODE} on attempt $i. Check logs above for full curl output. Retrying in ${delay}s..."
-                fi
+      #       for i in $(seq 1 $max_retries); do
+      #           echo "Retry $i of $max_retries: Connecting to ${API_URL}/api/status ..."
 
-                if [ $i -lt $max_retries ] && [ ${CURL_EXIT_CODE} -ne 0 ] ; then
-                    sleep $delay
-                fi
-            done
+      #           CURL_OUTPUT=$(curl -v -f -m 30 -o - "${API_URL}/api/status" 2>&1) || true
+      #           CURL_EXIT_CODE=$?
 
-            echo "Backend smoke test FAILED after ${max_retries} retries."
-            exit 1
+      #           echo "--- Curl Output (Attempt $i, Exit Code ${CURL_EXIT_CODE}) ---"
+      #           echo "${CURL_OUTPUT}"
+      #           echo "-----------------------------------------------------"
+
+      #           if [ ${CURL_EXIT_CODE} -eq 0 ]; then
+      #               if echo "${CURL_OUTPUT}" | grep -q "ok"; then
+      #                    echo "Smoke test PASSED: Found 'ok' in response after retry $i."
+      #                    exit 0
+      #               else
+      #                    echo "Smoke test FAILED on attempt $i: Curl connected (exit code 0), but 'ok' not found in response body. Check logs above."
+      #               fi
+      #           elif [ ${CURL_EXIT_CODE} -eq 7 ]; then
+      #               echo "Connection FAILED (curl exit code 7: Couldn't connect to host) on attempt $i. Retrying in ${delay}s..."
+      #           elif [ ${CURL_EXIT_CODE} -eq 28 ]; then
+      #               echo "Connection FAILED (curl exit code 28: Operation timed out) on attempt $i. Retrying in ${delay}s..."
+      #           else
+      #               echo "Curl FAILED with unexpected exit code ${CURL_EXIT_CODE} on attempt $i. Check logs above for full curl output. Retrying in ${delay}s..."
+      #           fi
+
+      #           if [ $i -lt $max_retries ] && [ ${CURL_EXIT_CODE} -ne 0 ] ; then
+      #               sleep $delay
+      #           fi
+      #       done
+
+      #       echo "Backend smoke test FAILED after ${max_retries} retries."
+      #       exit 1
 
       # - destroy-environment:
       #     when: always
